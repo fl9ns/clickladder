@@ -1,19 +1,20 @@
 
-const delay = 2;
-const pause = 2;
+const delay = 1_100;
 
 const trackmania = {
-    session: '<session ID>',
-    playerlogin: '<login>',
     lang: 'fr',
-    nickname: '<nickname>',
     path: 'World|France|Poitou-Charentes|Charente',
+    session: '<session>',
+    nickname: '<nickname>',
+    playerlogin: '<playerlogin>',
 }
 
 /////////////////////////////////////////
 
-import crypto from 'crypto';
-import readline from 'readline';
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const readline = require('readline');
 
 const link = `http://manialoto.net/clickladder/game.php?playerlogin=${trackmania.playerlogin}&lang=${trackmania.lang}&nickname=${trackmania.nickname}&path=${trackmania.path}&sess=${trackmania.session}`;
 const newlink = `http://manialoto.net/clickladder/game.php?zoneindextop=0&code=<code>&playerlogin=${trackmania.playerlogin}&lang=${trackmania.lang}&nickname=${trackmania.nickname}&path=${trackmania.path}&sess=${trackmania.session}`;
@@ -40,37 +41,42 @@ const color = {
     gray: '\x1b[90m',
     bold: '\x1b[1m',
 }
+const logfile = path.join(__dirname,'clickladder.log');
+
+process.on('SIGINT', end);
+process.on('SIGTERM', end);
 
 console.clear();
 process.stdout.write('\x1B[?25l'); // hide cursor
 
 const started = new Date();
 let totalClick = 0;
-let totalSession = 0;
 let totalPause = 0;
+let totalSession = 0;
 
 // Init display
 process.stdout.write(`${color.gray}` +
-    '+------------------------------------+\n' +
-    '|   MANIALOTO CLICKLADDER  BOT 0.1   |\n' +
-    '+---------+--------------------------+\n' +
-    '| Date    | -                        |\n' +
-    '| Click   | -                        |\n' +
-    '+---------+--------------------------+\n' +
-    '| Since   | -                        |\n' +
-    '| Session | -                        |\n' +
-    '+---------+--------------------------+\n' +
-    '| Pause   | -                        |\n' +
-    '| Status  | -                        |\n' +
-    '+---------+--------------------------+\n' +
-    '| Click/s | -                        |\n' +
-    '| Click/m | -                        |\n' +
-    '| Click/h | -                        |\n' +
-    '| Click/d | -                        |\n' +
-    '+---------+--------------------------+'
+    '+------------+-----------------------+\n' +
+    '| BOT 0.2    | -                     |\n' +
+    '+------------+-----------------------+\n' +
+    '| Date       | -                     |\n' +
+    '| Click      | -                     |\n' +
+    '+------------+-----------------------+\n' +
+    '| Since      | -                     |\n' +
+    '| Click      | -                     |\n' +
+    '+------------+-----------------------+\n' +
+    '| Pause      | -                     |\n' +
+    '| Status     | -                     |\n' +
+    '+------------+-----------------------+\n' +
+    '| Click/s    | -                     |\n' +
+    '| Click/m    | -                     |\n' +
+    '| Click/h    | -                     |\n' +
+    '| Click/d    | -                     |\n' +
+    '+------------+-----------------------+\n'
 );
-const indexInfo = 12;   // start info text
-const lengthInfo = 24;  // length max info
+const indexInfo = 15;   // start info text
+const lengthInfo = 21;  // length max info
+updateLine(1, `${delay} ms`, color.white);
 
 async function run(url) {
 
@@ -86,8 +92,6 @@ async function run(url) {
         
         const image = getImage(text);
 
-        await sleep(1000);
-
         const md5 = await getmd5(image);
         const codes = getCode(text);
         
@@ -102,26 +106,31 @@ async function run(url) {
         // update display
         display('running');
 
-
         // Next
         setTimeout( () => {
             const newUrl = newlink.replace('<code>', code);
             run(newUrl);
             totalSession++;
-        }, (delay-1)*1_000);
+        }, delay);
 
     } catch(e) {
 
         totalPause++;
 
+        // log
+        fs.appendFileSync(logfile, `${datenow()} Error ! Pause: ${totalPause}. Session: ${totalSession}. Since: ${since()}.\n`);
+
         // update display
         display('PAUSED');
 
         // pause
-        await sleep(pause*60_000); // min
+        await sleep(120_000); // 2 min
 
         // rerun
         run(link);
+
+        // log
+        fs.appendFileSync(logfile, `${datenow()} Restart.\n`);
     }
 }
 function datenow() {
@@ -207,8 +216,8 @@ function updateLine(line, text, foreground) {
     if(t.length > lengthInfo) {
         t = t.slice(0, lengthInfo);
     } else {
-        if(t.length < 24) {
-            while(t.length < 24) {
+        if(t.length < lengthInfo) {
+            while(t.length < lengthInfo) {
                 t = `${t} `;
             }
         }
@@ -260,6 +269,23 @@ function ratio() {
 
     return [cs, cm, ch, cd];
 }
+function end() {
+    const r = ratio();
+    fs.appendFileSync(logfile, `----------------------------------\n` +
+                               `${datenow()} End.\n` +
+                               `Since: ${since()}\n` +
+                               `Click: ${intfr(totalSession)}\n` +
+                               `Click/s: ${intfr(r[0])}\n` +
+                               `Click/m: ${intfr(r[1])}\n` +
+                               `Click/h: ${intfr(r[2])}\n` +
+                               `Click/d: ${intfr(r[3])}\n` +
+                               `----------------------------------\n`
+    );
+    process.exit(0);
+}
 
 // first run
 run(link);
+
+// log
+fs.appendFileSync(logfile, `${datenow()} Start. Delay: ${delay} ms.\n`);
