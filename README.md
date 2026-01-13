@@ -1,1 +1,1 @@
-# Manialoto Clickladder bot 0.1
+# Manialoto Clickladder bot 0.2
